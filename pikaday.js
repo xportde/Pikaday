@@ -743,16 +743,116 @@
         toString: function(format)
         {
             format = format || this._o.format;
+            /*
+             * if format is a function, give it the date
+             * as argument and show the function return parameter
+             *
+             * @author t.scholz@xport.de
+             * @created 08.09.15
+             */
+            if (typeof(this._o.format) == 'function') {
+                return this._o.format(this._d);
+            }
+            format = format || this._o.format;
             if (!isDate(this._d)) {
                 return '';
             }
             if (this._o.toString) {
-              return this._o.toString(this._d, format);
+                return this._o.toString(this._d, format);
             }
             if (hasMoment) {
-              return moment(this._d).format(format);
+                return moment(this._d).format(format);
+            }
+            else {
+                return this.xFormatDate(format || this._o.format);
             }
             return this._d.toDateString();
+        },
+
+        /**
+         * formats the date like php's date()-function
+         *
+         * @author t.scholz@xport.de
+         * @created 08.02.16
+         * @param {String} format format string
+         * @returns {String}
+         */
+        xFormatDate: function(format)
+        {
+            // no format string -> return Dates string representation
+            if (typeof(format) != 'string' || format.length == 0)
+                return this._d;
+
+            // emulate default xport settings
+            if (format === 'xFormat')
+                format = 'd.m.Y';
+            else if (format === 'xFormatEN')
+                format = 'd/m/Y';
+
+            var i = 0, char, result = '';
+            do {
+                char = format[i];
+
+                // if escape character, skip to next and leave it untranslated
+                result += (char === '\\' && (i+1) < format.length)
+                    ? format[++i]
+                    : this.xTranslateFormatChar(char);
+
+            } while (++i < format.length);
+
+            return result;
+        },
+
+
+        /**
+         * translates a character like php's date()-function
+         *
+         * @author t.scholz@xport.de
+         * @created 08.02.16
+         * @param {String} char Character
+         * @returns {String}
+         */
+        xTranslateFormatChar: function(char)
+        {
+            function force2Digits(val)
+            {
+                return ((String(val).length == 1) ? '0' : '') + val;
+            }
+
+            switch (char) {
+                // day of month
+                case 'j': return this._d.getDate();					// numeric without leading zero
+                case 'd': return force2Digits(this._d.getDate());	// numeric with leding zero
+                case 'S': 											// english ordinal suffix (st, nd, rd or th)
+                    switch (this._d.getDate()) {
+                        case 1:
+                        case 21:
+                        case 31:	return 'st';
+                        case 2:
+                        case 22:	return 'nd';
+                        case 3:
+                        case 23:	return 'rd';
+                        default:	return 'th';
+                    }
+
+                // weekday
+                case 'w': return this._d.getDay();									// numeric (0 = so, 1 = mo, ..., 6 = sa)
+                case 'N': return (this._d.getDay() == 0) ? 7 : this._d.getDay();	// numeric ISO-8601 (1 = mo, ..., 7 = so)
+                case 'D': return this._o.i18n.weekdaysShort[this._d.getDay()];		// short text (2 or 3 letters)
+                case 'l': return this._o.i18n.weekdays[this._d.getDay()];			// full text
+
+                // month
+                case 'n': return this._d.getMonth() + 1;								// numeric without leding zero
+                case 'm': return force2Digits(this._d.getMonth() + 1);					// numeric with leding zero
+                case 'M': return this._o.i18n.months[this._d.getMonth()].slice(0,3);	// short text (3 letters)
+                case 'F': return this._o.i18n.months[this._d.getMonth()];				// full text
+
+                // year
+                case 'y': return String(this._d.getFullYear()).slice(2);	// 2 digits
+                case 'Y': return this._d.getFullYear();						// 4 digits
+
+                default: return char;
+            }
         },
 
         /**
